@@ -64,7 +64,11 @@ def generate_upi_link(request):
     if invoice.status == Invoice.InvoiceStatus.PAID:
         return error('ALREADY_PAID', 'This invoice is already settled', status_code=409)
 
-    amount = serializer.validated_data.get('amount') or invoice.outstanding_amount
+    # Explicit None check: `or` would silently promote a submitted 0 to the
+    # full outstanding instead of rejecting it.
+    amount = serializer.validated_data.get('amount')
+    if amount is None:
+        amount = invoice.outstanding_amount
     amount = Decimal(str(amount)).quantize(Decimal('0.01'))
     if amount <= 0:
         return validation_error({'amount': ['Amount must be greater than zero']})
@@ -126,8 +130,19 @@ def submit_manual(request):
     if utr and PaymentRecord.objects.filter(utr_number=utr).exists():
         return error('UTR_ALREADY_USED', 'This UTR has already been recorded', status_code=409)
 
-    amount = serializer.validated_data.get('amount_paid') or invoice.outstanding_amount
+    amount = serializer.validated_data.get('amount_paid')
+    if amount is None:
+        amount = invoice.outstanding_amount
     amount = Decimal(str(amount)).quantize(Decimal('0.01'))
+    # Same guard generate-link applies. The web/mobile forms also block it, but
+    # a browser-only check is not a control: the claim must be bounded against
+    # the invoice here or an overpayment reaches the treasurer's queue.
+    if amount <= 0:
+        return validation_error({'amount_paid': ['Amount must be greater than zero']})
+    if amount > invoice.outstanding_amount:
+        return validation_error(
+            {'amount_paid': [f'Amount exceeds the outstanding balance of ₹{invoice.outstanding_amount}']}
+        )
 
     # A UPI intent the resident already opened should be completed, not
     # duplicated — otherwise the treasurer reviews the same transfer twice.

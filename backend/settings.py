@@ -192,7 +192,7 @@ SIMPLE_JWT = {
 # ── CORS / CSRF origins ─────────────────────────────────────────────────
 CORS_ALLOWED_ORIGINS = [
     o.strip()
-    for o in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:5173').split(',')
+    for o in os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:25105').split(',')
     if o.strip()
 ]
 # Django 4+ requires the scheme-qualified origin for unsafe (POST) requests that

@@ -11,6 +11,12 @@ from .models import PaymentRecord
 # would strand a genuine payment.
 UTR_RE = re.compile(r'^[0-9A-Za-z]{12,16}$')
 
+# Gap #20 (doc 02 §12): the edge caps uploads at 15 MB but the loopback port
+# has no cap, so the limit must travel with the request. Deliberately a byte
+# cap only — phone screenshots legitimately exceed 2048 px in one dimension,
+# so a pixel rejection would turn away the exact proofs MVR exists for.
+MAX_RECEIPT_BYTES = 5 * 1024 * 1024
+
 
 class PaymentRecordSerializer(serializers.ModelSerializer):
     invoice_number = serializers.CharField(source='invoice.invoice_number', read_only=True)
@@ -61,6 +67,13 @@ class ManualPaymentSerializer(serializers.Serializer):
             return None
         if not UTR_RE.match(value):
             raise serializers.ValidationError('UTR must be 12–16 letters/digits from the UPI receipt')
+        return value
+
+    def validate_receipt_image(self, value):
+        if value is not None and value.size > MAX_RECEIPT_BYTES:
+            raise serializers.ValidationError(
+                'Screenshot is over 5 MB — share a smaller copy from your UPI app.'
+            )
         return value
 
     def validate(self, attrs):

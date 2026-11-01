@@ -1,10 +1,14 @@
 """UPI intent and manual-verification (MVR) tests — doc 04 §9, doc 03 §2.6."""
 
+import io
+import os
 from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from PIL import Image
 
 from apps.core.testing import api_client, committee, make_society, make_unit, make_user
 from apps.invoices.models import Invoice
@@ -62,6 +66,15 @@ class UpiIntentEndpointTests(TestCase):
         response = api_client(self.resident).post(
             reverse('payments:upi-generate-link'),
             {'invoice_id': self.invoice.pk, 'amount': '99999.00'},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('amount', response.json()['error']['details'])
+
+    def test_zero_amount_is_rejected_not_promoted_to_the_full_balance(self):
+        response = api_client(self.resident).post(
+            reverse('payments:upi-generate-link'),
+            {'invoice_id': self.invoice.pk, 'amount': '0.00'},
             content_type='application/json',
         )
         self.assertEqual(response.status_code, 400)
@@ -131,6 +144,53 @@ class ManualVerificationTests(TestCase):
         second = self.submit(utr_number='897654321014')
         self.assertEqual(second.status_code, 409)
         self.assertEqual(second.json()['error']['code'], 'UTR_ALREADY_USED')
+
+    def test_claim_cannot_exceed_the_outstanding_balance(self):
+        # The web/mobile forms block overpayments, but the server is the control
+        # (gap list in PaymentReceiptForm's header — this closes it).
+        response = self.submit(utr_number='897654321015', amount_paid='99999.00')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('amount_paid', response.json()['error']['details'])
+        self.assertEqual(PaymentRecord.objects.filter(invoice=self.invoice).count(), 0)
+
+    def test_zero_claim_is_rejected_not_promoted_to_the_full_balance(self):
+        response = self.submit(utr_number='897654321016', amount_paid='0.00')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('amount_paid', response.json()['error']['details'])
+
+    def test_a_partial_claim_is_recorded_as_submitted(self):
+        response = self.submit(utr_number='897654321017', amount_paid='500.00')
+        self.assertEqual(response.status_code, 201, response.json())
+        self.assertEqual(Decimal(response.json()['data']['amount_paid']), Decimal('500.00'))
+
+    def submit_with_receipt(self, receipt, **body):
+        # The test client multipart-encodes SimpleUploadedFile values on its own.
+        return self.client.post(
+            reverse('payments:submit-manual'),
+            {'invoice_id': self.invoice.pk, **body, 'receipt_image': receipt},
+        )
+
+    @staticmethod
+    def make_png(px):
+        # Random pixels barely compress, so the PNG lands near px²×3 bytes —
+        # enough to build a valid image that is legitimately over the 5 MB cap.
+        buf = io.BytesIO()
+        Image.frombytes('RGB', (px, px), os.urandom(px * px * 3)).save(buf, 'PNG')
+        return SimpleUploadedFile('receipt.png', buf.getvalue(), content_type='image/png')
+
+    def test_receipt_over_the_size_cap_is_rejected(self):
+        # Gap #20 (doc 02 §12): the cap must apply through the loopback port too.
+        response = self.submit_with_receipt(self.make_png(1500), utr_number='897654321018')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('receipt_image', response.json()['error']['details'])
+        self.assertEqual(PaymentRecord.objects.filter(invoice=self.invoice).count(), 0)
+
+    def test_a_screenshot_receipt_without_utr_is_accepted(self):
+        response = self.submit_with_receipt(self.make_png(40))
+        self.assertEqual(response.status_code, 201, response.json())
+        payment = PaymentRecord.objects.get(invoice=self.invoice)
+        self.assertIsNotNone(payment.receipt_image)
+        self.assertEqual(payment.status, PaymentRecord.PaymentStatus.PENDING_VERIFICATION)
 
 
 class VerifyPaymentTests(TestCase):

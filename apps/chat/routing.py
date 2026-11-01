@@ -1,8 +1,10 @@
-"""WebSocket URL registration for ``backend/asgi.py``.
+"""WebSocket URL registration for ``backend/asgi.py`` (doc 08 §3.2).
 
-The W1 stub lived in ``views.py``; keeping the module here means the ASGI app
-imports cleanly today, and W5 (doc 08) replaces the stub consumer below with
-``consumers.ChatConsumer`` without touching ``asgi.py``.
+The room id is part of the path — both clients fetch it from
+``GET /api/v1/chat/rooms/`` before opening a socket, and
+``ChatConsumer._get_room`` verifies it belongs to the caller's society
+before joining any group. Auth is the ``?access=`` JWT handled inside the
+consumer (doc 08 §2: no cookies on WebSocket connections).
 """
 
 from django.urls import path

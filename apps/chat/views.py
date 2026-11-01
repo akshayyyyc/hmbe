@@ -17,7 +17,7 @@ from apps.core.responses import error, ok, validation_error
 
 from .models import ChatMessage
 from .serializers import ChatMessageSerializer, ChatRoomSerializer
-from .services import mark_read, room_for_user, unread_count
+from .services import mark_read, room_for_user
 
 logger = logging.getLogger(__name__)
 

@@ -18,4 +18,10 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
+# ASGI via uvicorn worker class: one process serves REST and /ws/ (doc 02 gap #3,
+# closed W5). gunicorn keeps the process model (workers, restarts, logs); the
+# WSGI backend.wsgi:application could never complete a WebSocket upgrade.
+CMD ["gunicorn", "backend.asgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--access-logfile", "-", "--error-logfile", "-"]
