@@ -1,0 +1,15 @@
+# Keep the build context small — generated artefacts must not be copied into the image
+# (deps come from requirements.txt). ``venv/`` / ``.venv/`` are guards, not a description:
+# this project has no host venv by design (doc 02 §4.2) — if one reappears here it must not
+# reach the image, and ``db.sqlite3``/.env* likewise stay out.
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+db.sqlite3
+media/
+static/
+staticfiles/
+.env

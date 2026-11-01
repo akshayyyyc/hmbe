@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+venv/
+env/
+
+# Django generated output (collectstatic / uploads)
+staticfiles/
+static/
+media/
+
+# Secrets — runtime config comes from the repo-root .env via Docker Compose
+.env
+.env.*
+*.log
+
+# IDE / OS
+.idea/
+.vscode/settings.local.json
+.DS_Store
+Thumbs.db
+desktop.ini

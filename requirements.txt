@@ -1,0 +1,39 @@
+# =============================================
+# HomeManager — Backend Python Dependencies
+# =============================================
+
+# Django & DRF
+Django>=5.0,<6.0
+djangorestframework>=3.14,<4.0
+djangorestframework-simplejwt>=5.3,<6.0
+django-cors-headers>=4.3,<5.0
+django-extensions>=3.2,<4.0
+
+# Django Channels (WebSocket)
+channels>=4.0,<5.0
+channels-redis>=4.1,<5.0
+
+# Image processing (models.ImageField: profile_photo, receipt_image)
+Pillow>=10.2,<11.0
+
+# Database
+psycopg2-binary>=2.9,<3.0
+dj-database-url>=2.1,<3.0
+
+# Redis
+redis>=5.0,<6.0
+hiredis>=2.2,<3.0
+
+# Gunicorn (WSGI server)
+gunicorn>=21.2,<23.0
+
+# No dotenv loader on purpose: configuration comes from the process environment, which
+# Docker Compose builds from the root .env (local) or the deploy host exports (prod).
+# A second .env inside hmbe/ used to let a process talk to a different Postgres/Redis
+# than the product does. "Local backend" means the compose containers — doc 02 §5.1.
+
+# Pre-commit hooks (dev)
+pre-commit>=3.5,<4.0
+black>=24.2,<25.0
+isort>=5.13,<6.0
+ruff>=0.2,<0.3
